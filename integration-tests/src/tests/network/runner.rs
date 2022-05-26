@@ -105,7 +105,7 @@ fn setup_network_node(
         )
         .0;
         let view_client_actor = start_view_client(
-            config.validator.as_ref().map(|v|v.account_id()),
+            config.validator.as_ref().map(|v| v.account_id()),
             chain_genesis.clone(),
             runtime.clone(),
             network_adapter,
@@ -113,8 +113,7 @@ fn setup_network_node(
             adv,
         );
 
-        let routing_table_addr =
-            start_routing_table_actor(config.node_id(), store.clone());
+        let routing_table_addr = start_routing_table_actor(config.node_id(), store.clone());
 
         PeerManagerActor::new(
             store.clone(),
