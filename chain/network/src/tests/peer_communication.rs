@@ -2,7 +2,8 @@ use crate::network_protocol::Encoding;
 use crate::tests::data;
 use crate::tests::peer_actor::{PeerConfig, PeerHandle, Response};
 use crate::tests::stream::Stream;
-use crate::tests::util::{make_rng, FakeClock};
+use crate::tests::util::make_rng;
+use crate::time::FakeClock;
 use crate::types::{Handshake, HandshakeFailureReason, PeerMessage};
 use anyhow::Context as _;
 use assert_matches::assert_matches;
@@ -39,8 +40,9 @@ async fn test_peer_communication(
     };
 
     let (outbound_stream, inbound_stream) = PeerHandle::start_connection().await;
-    let mut inbound = PeerHandle::start_endpoint(inbound_cfg, inbound_stream).await;
-    let mut outbound = PeerHandle::start_endpoint(outbound_cfg, outbound_stream).await;
+    let mut inbound = PeerHandle::start_endpoint(clock.clock(), inbound_cfg, inbound_stream).await;
+    let mut outbound =
+        PeerHandle::start_endpoint(clock.clock(), outbound_cfg, outbound_stream).await;
 
     assert_eq!(Response::HandshakeDone, outbound.recv().await);
     assert_eq!(Response::HandshakeDone, inbound.recv().await);
@@ -188,7 +190,7 @@ async fn test_handshake(outbound_encoding: Option<Encoding>, inbound_encoding: O
         start_handshake_with: None,
     };
     let (outbound_stream, inbound_stream) = PeerHandle::start_connection().await;
-    let inbound = PeerHandle::start_endpoint(inbound_cfg, inbound_stream).await;
+    let inbound = PeerHandle::start_endpoint(clock.clock(), inbound_cfg, inbound_stream).await;
     let mut outbound = Stream::new(outbound_encoding, outbound_stream);
 
     // Send too old PROTOCOL_VERSION, expect ProtocolVersionMismatch

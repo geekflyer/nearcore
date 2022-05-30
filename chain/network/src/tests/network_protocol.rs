@@ -1,6 +1,7 @@
 use crate::network_protocol::Encoding;
 use crate::tests::data;
-use crate::tests::util::{make_rng, FakeClock};
+use crate::tests::util::make_rng;
+use crate::time::FakeClock;
 use crate::types::{HandshakeFailureReason, PeerMessage};
 use anyhow::{bail, Context as _};
 use near_network_primitives::types::{

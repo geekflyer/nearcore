@@ -214,8 +214,6 @@ struct JsonRpcHandler {
     enable_debug_rpc: bool,
     #[cfg(feature = "test_features")]
     peer_manager_addr: Addr<near_network::PeerManagerActor>,
-    #[cfg(feature = "test_features")]
-    routing_table_addr: Addr<near_network::RoutingTableActor>,
 }
 
 impl JsonRpcHandler {
@@ -316,26 +314,6 @@ impl JsonRpcHandler {
                             .map_err(|err| RpcError::serialization_error(err.to_string())),
                     )
                 }
-                #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
-                "adv_start_routing_table_syncv2" => {
-                    let params = parse_params::<
-                        near_jsonrpc_adversarial_primitives::StartRoutingTableSyncRequest,
-                    >(params)?;
-
-                    self.peer_manager_addr
-                        .send(
-                            near_network::types::PeerManagerMessageRequest::StartRoutingTableSync(
-                                near_network::private_actix::StartRoutingTableSync {
-                                    peer_id: params.peer_id,
-                                },
-                            ),
-                        )
-                        .await?;
-                    Some(
-                        serde_json::to_value(())
-                            .map_err(|err| RpcError::serialization_error(err.to_string())),
-                    )
-                }
                 "adv_get_peer_id" => {
                     let response = self
                         .peer_manager_addr
@@ -350,12 +328,12 @@ impl JsonRpcHandler {
                 }
                 "adv_get_routing_table" => {
                     let result = self
-                        .routing_table_addr
-                        .send(near_network::RoutingTableMessages::RequestRoutingTable)
+                        .peer_manager_addr
+                        .send(near_network::types::PeerManagerMessageRequest::GetRoutingTable)
                         .await?;
 
                     match result {
-                        near_network::RoutingTableMessagesResponse::RequestRoutingTableResponse {
+                        near_network::types::PeerManagerMessageResponse::GetRoutingTable {
                             edges_info: routing_table,
                         } => {
                             let response = {
@@ -1479,7 +1457,6 @@ pub fn start_http(
     client_addr: Addr<ClientActor>,
     view_client_addr: Addr<ViewClientActor>,
     #[cfg(feature = "test_features")] peer_manager_addr: Addr<near_network::PeerManagerActor>,
-    #[cfg(feature = "test_features")] routing_table_addr: Addr<near_network::RoutingTableActor>,
 ) -> Vec<(&'static str, actix_web::dev::ServerHandle)> {
     let RpcConfig {
         addr,
@@ -1504,8 +1481,6 @@ pub fn start_http(
                 enable_debug_rpc,
                 #[cfg(feature = "test_features")]
                 peer_manager_addr: peer_manager_addr.clone(),
-                #[cfg(feature = "test_features")]
-                routing_table_addr: routing_table_addr.clone(),
             }))
             .app_data(web::JsonConfig::default().limit(limits_config.json_payload_max_size))
             .wrap(middleware::Logger::default())

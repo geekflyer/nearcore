@@ -22,7 +22,6 @@ use near_network::test_utils::{
 };
 
 use crate::tests::network::multiset::MultiSet;
-use near_network::routing::start_routing_table_actor;
 #[cfg(feature = "test_features")]
 use near_network::test_utils::SetAdvOptions;
 use near_network::types::PeerManagerMessageRequest;
@@ -113,14 +112,11 @@ fn setup_network_node(
             adv,
         );
 
-        let routing_table_addr = start_routing_table_actor(config.node_id(), store.clone());
-
         PeerManagerActor::new(
             store.clone(),
             config,
             client_actor.recipient(),
             view_client_actor.recipient(),
-            routing_table_addr,
         )
         .unwrap()
         .with_ping_counter(Box::new(ping_counter))

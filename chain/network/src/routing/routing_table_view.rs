@@ -1,4 +1,5 @@
 use crate::routing::route_back_cache::RouteBackCache;
+use crate::time;
 use itertools::Itertools;
 use lru::LruCache;
 use near_network_primitives::types::{Edge, PeerIdOrHash};
@@ -8,17 +9,11 @@ use near_primitives::types::AccountId;
 use near_store::{DBCol, Store};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 use tracing::warn;
 
 const ANNOUNCE_ACCOUNT_CACHE_SIZE: usize = 10_000;
 const ROUND_ROBIN_MAX_NONCE_DIFFERENCE_ALLOWED: usize = 10;
 const ROUND_ROBIN_NONCE_CACHE_SIZE: usize = 10_000;
-/// Routing table will clean edges if there is at least one node that is not reachable
-/// since `SAVE_PEERS_MAX_TIME` seconds. All peers disconnected since `SAVE_PEERS_AFTER_TIME`
-/// seconds will be removed from cache and persisted in disk.
-pub(crate) const SAVE_PEERS_MAX_TIME: Duration = Duration::from_secs(7_200);
-pub(crate) const DELETE_PEERS_AFTER_TIME: Duration = Duration::from_secs(3_600);
 
 pub struct RoutingTableView {
     /// PeerId associated for every known account id.
@@ -99,11 +94,15 @@ impl RoutingTableView {
         }
     }
 
-    pub(crate) fn find_route(&mut self, target: &PeerIdOrHash) -> Result<PeerId, FindRouteError> {
+    pub(crate) fn find_route(
+        &mut self,
+        clock: &time::Clock,
+        target: &PeerIdOrHash,
+    ) -> Result<PeerId, FindRouteError> {
         match target {
             PeerIdOrHash::PeerId(peer_id) => self.find_route_from_peer_id(peer_id),
             PeerIdOrHash::Hash(hash) => {
-                self.fetch_route_back(*hash).ok_or(FindRouteError::RouteBackNotFound)
+                self.fetch_route_back(clock, *hash).ok_or(FindRouteError::RouteBackNotFound)
             }
         }
     }
@@ -151,13 +150,18 @@ impl RoutingTableView {
         }
     }
 
-    pub(crate) fn add_route_back(&mut self, hash: CryptoHash, peer_id: PeerId) {
-        self.route_back.insert(hash, peer_id);
+    pub(crate) fn add_route_back(
+        &mut self,
+        clock: &time::Clock,
+        hash: CryptoHash,
+        peer_id: PeerId,
+    ) {
+        self.route_back.insert(clock, hash, peer_id);
     }
 
     // Find route back with given hash and removes it from cache.
-    fn fetch_route_back(&mut self, hash: CryptoHash) -> Option<PeerId> {
-        self.route_back.remove(&hash)
+    fn fetch_route_back(&mut self, clock: &time::Clock, hash: CryptoHash) -> Option<PeerId> {
+        self.route_back.remove(clock, &hash)
     }
 
     pub(crate) fn compare_route_back(&self, hash: CryptoHash, peer_id: &PeerId) -> bool {
